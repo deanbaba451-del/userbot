@@ -29,55 +29,75 @@ session_string = "1BJWap1wBuxby9hSYUeqYoO_um3b2teWTX71R8lqGGpW8DBAQGG7rlbYCHrFzt
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 AUTHORIZED_USERS = [6534222591, 8256872080, 8343507331]
 lock_mode = {}
+echo_user = {} # Grup ID : Taklit Edilen Kişi ID
 
-# --- KİLİT KOMUTLARI (TEPKİ ÖZELLİĞİ EKLENDİ) ---
-@client.on(events.NewMessage(pattern=r'^/lock (.+)'))
-async def lock_handler(event):
-    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: 
+# --- TAKLİT (ECHO) KOMUTU ---
+@client.on(events.NewMessage(pattern=r'^/echo'))
+async def echo_handler(event):
+    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: return
+    
+    chat_id = event.chat_id
+    
+    # Eğer zaten birini taklit ediyorsa, kapat
+    if chat_id in echo_user:
+        del echo_user[chat_id]
+        await event.respond("🔕 Taklit modu kapatıldı.")
         return
-    
-    mode = event.pattern_match.group(1).lower()
-    lock_mode[event.chat_id] = mode
-    
-    # Mesaja 😁 tepkisi bırak
-    try:
-        await client(SendReactionRequest(
-            peer=event.chat_id,
-            msg_id=event.id,
-            reaction=[ReactionEmoji(emoticon='😁')]
-        ))
-    except:
-        pass
 
-# --- MESAJ SİLME SİSTEMİ ---
+    # Bir mesajı yanıtlayarak mı yazdı?
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        target_id = reply_msg.sender_id
+        echo_user[chat_id] = target_id
+        await event.respond(f"👤 Kişi takibe alındı, ne yazarsa aynısını yazacağım!")
+    else:
+        await event.reply("⚠️ Birini taklit etmek için mesajını yanıtlayarak `/echo` yazmalısın.")
+
+# --- ANA MESAJ DÖNGÜSÜ ---
 @client.on(events.NewMessage)
-async def delete_handler(event):
-    if not event.is_group or event.chat_id not in lock_mode: 
-        return
-    
-    # Botun kendisi ve 6534222591 muaf
-    me = await client.get_me()
-    if event.sender_id == me.id or event.sender_id == 6534222591:
-        return
+async def main_handler(event):
+    if not event.is_group: return
+    chat_id = event.chat_id
+    sender_id = event.sender_id
 
-    mode = lock_mode[event.chat_id]
-    if mode == "off" or mode == "0": 
-        return
-    
-    msg = event.message
-    if mode == "1":
-        try: await msg.delete()
-        except: pass
-    
-    elif mode == "2":
-        if msg.media and not msg.voice:
+    # 1. TAKLİT MODU KONTROLÜ
+    if chat_id in echo_user and sender_id == echo_user[chat_id]:
+        if event.text: # Sadece metin mesajlarını taklit et (medyada çökmesin)
+            await event.respond(event.text)
+
+    # 2. KİLİT (LOCK) SİSTEMİ KONTROLÜ
+    if chat_id in lock_mode:
+        # Botun kendisi ve 6534222591 muaf
+        me = await client.get_me()
+        if sender_id == me.id or sender_id == 6534222591:
+            return
+
+        mode = lock_mode[chat_id]
+        if mode == "off" or mode == "0": return
+        
+        msg = event.message
+        if mode == "1":
             try: await msg.delete()
             except: pass
+        elif mode == "2":
+            if msg.media and not msg.voice:
+                try: await msg.delete()
+                except: pass
+
+# --- KİLİT KOMUTLARI ---
+@client.on(events.NewMessage(pattern=r'^/lock (.+)'))
+async def lock_handler(event):
+    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: return
+    mode = event.pattern_match.group(1).lower()
+    lock_mode[event.chat_id] = mode
+    try:
+        await client(SendReactionRequest(peer=event.chat_id, msg_id=event.id, reaction=[ReactionEmoji(emoticon='😁')]))
+    except: pass
 
 # --- BAŞLATICI ---
 async def main():
     await client.start()
-    print("Bot sessiz modda aktif!")
+    print("Userbot ve Taklit Modu Aktif!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
