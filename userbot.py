@@ -25,77 +25,54 @@ session_string = "1BJWap1wBuxby9hSYUeqYoO_um3b2teWTX71R8lqGGpW8DBAQGG7rlbYCHrFzt
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
-# Yetkili Kullanıcılar (Yeni ID eklendi)
 AUTHORIZED_USERS = [6534222591, 8256872080, 8343507331]
-lock_mode = {}
-media_clean_target = -1003626403225 # Hedef Grup ID
-media_clean_interval = 180 # Varsayılan 3 dakika (saniye cinsinden)
-media_clean_task = None
+active_loops = {} # Grup ID : True/False
 
-# --- KOMUTLAR ---
+# --- YENİ KOMUT: /loop [metin] ---
+@client.on(events.NewMessage(pattern=r'^/loop (.+)'))
+async def loop_handler(event):
+    if event.sender_id not in AUTHORIZED_USERS: return
+    
+    chat_id = event.chat_id
+    text = event.pattern_match.group(1)
+    
+    if text.lower() == "stop":
+        active_loops[chat_id] = False
+        await event.reply("🛑 Loop durduruldu.")
+        return
 
-# /spam metin sayı
+    active_loops[chat_id] = True
+    await event.delete() # Komutu sil
+    
+    while active_loops.get(chat_id):
+        try:
+            msg = await client.send_message(chat_id, text)
+            await asyncio.sleep(0.1) # 0.1 saniye bekle
+            await msg.delete()
+        except Exception:
+            await asyncio.sleep(1) # Flood hatası alırsan biraz daha fazla bekle
+
+# --- DİĞER KOMUTLAR ---
 @client.on(events.NewMessage(pattern=r'^/spam (.+) (\d+)'))
 async def spam_handler(event):
     if event.sender_id not in AUTHORIZED_USERS: return
-    text = event.pattern_match.group(1)
-    count = int(event.pattern_match.group(2))
+    text, count = event.pattern_match.group(1), int(event.pattern_match.group(2))
     for _ in range(count):
         await event.respond(text)
-        await asyncio.sleep(0.3) # Flood kontrolü için kısa bekleme
+        await asyncio.sleep(0.2)
 
-# /medya süre (saniye cinsinden)
 @client.on(events.NewMessage(pattern=r'^/medya (\d+)'))
 async def media_timer_handler(event):
     if event.sender_id not in AUTHORIZED_USERS: return
     global media_clean_interval
     media_clean_interval = int(event.pattern_match.group(1))
-    await event.reply(f"✅ Medya silme süresi {media_clean_interval} saniye olarak güncellendi.")
+    await event.reply(f"✅ Süre {media_clean_interval} saniye yapıldı.")
 
-# Lock Komutları (Eski yapı korundu)
-@client.on(events.NewMessage(pattern=r'^/lock (.+)'))
-async def lock_handler(event):
-    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: return
-    mode = event.pattern_match.group(1).lower()
-    lock_mode[event.chat_id] = mode
-    await event.reply(f"🔒 Mod {mode} aktif edildi.")
-
-# --- OTOMATİK MEDYA SİLİCİ (LOOP) ---
-async def auto_media_cleaner():
-    while True:
-        try:
-            async for message in client.iter_messages(media_clean_target, limit=50):
-                if message.media:
-                    await message.delete()
-        except Exception as e:
-            print(f"Temizleme hatası: {e}")
-        await asyncio.sleep(media_clean_interval)
-
-# --- ANA SİLME MANTIĞI ---
-@client.on(events.NewMessage)
-async def delete_handler(event):
-    if not event.is_group or event.chat_id not in lock_mode: return
-    mode = lock_mode[event.chat_id]
-    if mode == "0" or mode == "off": return
-    
-    msg = event.message
-    if mode == "1":
-        if msg.media or (msg.text and re.search(r'https?://|t\.me', msg.text)):
-            await msg.delete()
-    elif mode == "2":
-        if msg.media and not msg.voice:
-            await msg.delete()
-
-# --- BAŞLATMA ---
+# --- ANA DÖNGÜ VE BAŞLATMA ---
 async def main():
-    print("Bot Render üzerinde tüm özelliklerle başlatılıyor...")
     Thread(target=run_server, daemon=True).start()
     await client.start()
-    
-    # Medya temizleme döngüsünü arka planda başlat
-    asyncio.create_task(auto_media_cleaner())
-    
-    print("Giriş Başarılı ve Medya Temizleyici Aktif!")
+    print("Bot ve Loop sistemi aktif!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
