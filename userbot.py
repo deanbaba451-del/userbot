@@ -1,12 +1,11 @@
 import os
-import re
 import asyncio
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-# --- RENDER HEALTH CHECK (7/24 Aktif Kalması İçin) ---
+# --- RENDER HEALTH CHECK ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -25,12 +24,10 @@ session_string = "1BJWap1wBuxby9hSYUeqYoO_um3b2teWTX71R8lqGGpW8DBAQGG7rlbYCHrFzt
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
-# Yetkili ID'ler
 AUTHORIZED_USERS = [6534222591, 8256872080, 8343507331]
 lock_mode = {}
 
 # --- KOMUTLAR ---
-
 @client.on(events.NewMessage(pattern=r'^/lock (.+)'))
 async def lock_handler(event):
     if event.sender_id not in AUTHORIZED_USERS or not event.is_group:
@@ -41,16 +38,32 @@ async def lock_handler(event):
 
     if mode == "1":
         lock_mode[chat_id] = 1
-        await event.reply("🔒 **Lock 1 aktif** (Her şey silinir: Medya, Link, Metin)")
+        await event.reply("🔒 **Lock 1 aktif** (Her şey siliniyor)")
     elif mode == "2":
         lock_mode[chat_id] = 2
-        await event.reply("🔒 **Lock 2 aktif** (Sadece Medya ve Ses silinir, Metin serbest)")
+        await event.reply("🔒 **Lock 2 aktif** (Metin ve Ses serbest, diğerleri yasak)")
     elif mode == "off":
         lock_mode[chat_id] = 0
         await event.reply("🔓 **Kilit kapatıldı.**")
 
-# --- SİLME MANTIĞI ---
+# --- MESAJ DÜZENLEME KONTROLÜ ---
+@client.on(events.MessageEdited)
+async def edited_handler(event):
+    if not event.is_group:
+        return
+    
+    try:
+        # Düzenlenen mesajı sil
+        await event.delete()
+        # Düzenleyen kişiyi etiketle ve uyar
+        sender = await event.get_sender()
+        name = sender.first_name
+        mention = f"[{name}](tg://user?id={event.sender_id})"
+        await event.respond(f"⚠️ {mention}, mesaj düzenlemek yasak!")
+    except:
+        pass
 
+# --- SİLME MANTIĞI ---
 @client.on(events.NewMessage)
 async def delete_handler(event):
     if not event.is_group or event.chat_id not in lock_mode:
@@ -62,27 +75,28 @@ async def delete_handler(event):
 
     msg = event.message
 
-    # /lock 1 -> Atılan her şeyi siler
+    # /lock 1 -> Her şeyi siler
     if mode == 1:
         try:
             await msg.delete()
         except:
             pass
 
-    # /lock 2 -> Sadece Medya ve Sesli mesajları siler (Metin kalır)
+    # /lock 2 -> Metin ve Ses hariç her şeyi siler
     elif mode == 2:
-        if msg.media: # Fotoğraf, video, dosya, ses kaydı vb. her türlü medya
+        # Mesajda medya varsa ve bu medya bir ses kaydı (voice) değilse sil
+        if msg.media and not msg.voice:
             try:
                 await msg.delete()
             except:
                 pass
 
-# --- ANA BAŞLATICI ---
+# --- BAŞLATICI ---
 async def main():
     print("Bot başlatılıyor...")
     Thread(target=run_server, daemon=True).start()
     await client.start()
-    print("Bot Render üzerinde sorunsuz çalışıyor!")
+    print("Bot Render üzerinde çalışıyor!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
