@@ -1,15 +1,17 @@
 import os
 import re
+import asyncio
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-# --- RENDER PORT HATASINI ENGELLEMEK İÇİN (HEALTH CHECK) ---
+# --- RENDER HEALTH CHECK (7/24 Aktif Kalması İçin) ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is alive!")
+        self.wfile.write(b"Bot is active!")
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
@@ -19,57 +21,69 @@ def run_server():
 # --- BOT AYARLARI ---
 api_id = 30150271
 api_hash = "bbe0e183c97ead8a86926ecb95938486"
+session_string = "1BJWap1wBuxby9hSYUeqYoO_um3b2teWTX71R8lqGGpW8DBAQGG7rlbYCHrFzthXLCe2jZT36TDvZOEx08eZQzjTPS_pZ0xDX4wEYotrEkkGaUJwNE_6iZ8UZuBDBJX6PIb1xclOarZZoPZVWrP6qIzF1qwuq73m6cQhlf41pt5PUrkYcgat-Kc2xZYSUDTj96r5qhVXr8Fx6gfcq38eh9zt-CNc4sL9dLy_j5NCpjyCsNTBi0kF5mFI23Dws7hTGl8OvBhj-h7Ay8D4altC6f7CgjpmfYaQ0Ymp9K4EhSUGtsIqocex3S-Tbs1PrY16lC4xeY6Lg63rZ7bD4ciFa9W6Z8mvQxHQ="
 
-# 'mysession' ismi, yüklediğin mysession.session dosyasıyla aynı olmalı
-client = TelegramClient("mysession", api_id, api_hash)
+client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
-AUTHORIZED_USERS = [6534222591, 8256872080]
+# Yetkili ID'ler
+AUTHORIZED_USERS = [6534222591, 8256872080, 8343507331]
 lock_mode = {}
+
+# --- KOMUTLAR ---
 
 @client.on(events.NewMessage(pattern=r'^/lock (.+)'))
 async def lock_handler(event):
     if event.sender_id not in AUTHORIZED_USERS or not event.is_group:
         return
-
+    
     mode = event.pattern_match.group(1).lower()
     chat_id = event.chat_id
 
     if mode == "1":
         lock_mode[chat_id] = 1
-        await event.reply("🔒 Lock 1 aktif (Medya + link silinir)")
+        await event.reply("🔒 **Lock 1 aktif** (Her şey silinir: Medya, Link, Metin)")
     elif mode == "2":
         lock_mode[chat_id] = 2
-        await event.reply("🔒 Lock 2 aktif (Metin + ses serbest)")
+        await event.reply("🔒 **Lock 2 aktif** (Sadece Medya ve Ses silinir, Metin serbest)")
     elif mode == "off":
         lock_mode[chat_id] = 0
-        await event.reply("🔓 Lock kapatıldı")
+        await event.reply("🔓 **Kilit kapatıldı.**")
+
+# --- SİLME MANTIĞI ---
 
 @client.on(events.NewMessage)
 async def delete_handler(event):
     if not event.is_group or event.chat_id not in lock_mode:
         return
-
+    
     mode = lock_mode[event.chat_id]
-    if mode == 0: return
+    if mode == 0:
+        return
 
     msg = event.message
 
+    # /lock 1 -> Atılan her şeyi siler
     if mode == 1:
-        if msg.media or (msg.text and re.search(r'https?://|t\.me', msg.text)):
-            try: await msg.delete()
-            except: pass
+        try:
+            await msg.delete()
+        except:
+            pass
 
+    # /lock 2 -> Sadece Medya ve Sesli mesajları siler (Metin kalır)
     elif mode == 2:
-        # Sadece ses (voice) ve saf metin (media olmayan) kalsın
-        if not msg.voice and msg.media:
-            try: await msg.delete()
-            except: pass
+        if msg.media: # Fotoğraf, video, dosya, ses kaydı vb. her türlü medya
+            try:
+                await msg.delete()
+            except:
+                pass
 
-# --- BAŞLAT ---
-if __name__ == '__main__':
-    # Render'ın botu kapatmaması için web server'ı başlatıyoruz
+# --- ANA BAŞLATICI ---
+async def main():
+    print("Bot başlatılıyor...")
     Thread(target=run_server, daemon=True).start()
-    
-    print("Bot Render üzerinde başlatılıyor...")
-    client.start()
-    client.run_until_disconnected()
+    await client.start()
+    print("Bot Render üzerinde sorunsuz çalışıyor!")
+    await client.run_until_disconnected()
+
+if __name__ == '__main__':
+    asyncio.run(main())
