@@ -2,6 +2,8 @@ import os
 import asyncio
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.types import ReactionEmoji
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
@@ -13,12 +15,10 @@ class HealthCheck(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot Aktif!")
 
 def run_server():
-    # Render'ın beklediği portu açar
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheck)
     server.serve_forever()
 
-# Portu hemen başlatıyoruz
 Thread(target=run_server, daemon=True).start()
 
 # --- AYARLAR ---
@@ -30,28 +30,45 @@ client = TelegramClient(StringSession(session_string), api_id, api_hash)
 AUTHORIZED_USERS = [6534222591, 8256872080, 8343507331]
 lock_mode = {}
 
-# --- KİLİT KOMUTLARI ---
+# --- KİLİT KOMUTLARI (TEPKİ ÖZELLİĞİ EKLENDİ) ---
 @client.on(events.NewMessage(pattern=r'^/lock (.+)'))
 async def lock_handler(event):
-    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: return
+    if event.sender_id not in AUTHORIZED_USERS or not event.is_group: 
+        return
+    
     mode = event.pattern_match.group(1).lower()
     lock_mode[event.chat_id] = mode
-    await event.reply(f"🔒 **Mod {mode} aktif edildi.**")
+    
+    # Mesaja 😁 tepkisi bırak
+    try:
+        await client(SendReactionRequest(
+            peer=event.chat_id,
+            msg_id=event.id,
+            reaction=[ReactionEmoji(emoticon='😁')]
+        ))
+    except:
+        pass
 
 # --- MESAJ SİLME SİSTEMİ ---
 @client.on(events.NewMessage)
 async def delete_handler(event):
-    if not event.is_group or event.chat_id not in lock_mode: return
+    if not event.is_group or event.chat_id not in lock_mode: 
+        return
+    
+    # Botun kendisi ve 6534222591 muaf
+    me = await client.get_me()
+    if event.sender_id == me.id or event.sender_id == 6534222591:
+        return
+
     mode = lock_mode[event.chat_id]
-    if mode == "off" or mode == "0": return
+    if mode == "off" or mode == "0": 
+        return
     
     msg = event.message
-    # Mod 1: Her şeyi siler (Metin, Medya, Link)
     if mode == "1":
         try: await msg.delete()
         except: pass
     
-    # Mod 2: Metin ve Ses (voice) serbest, diğer her şey (Foto, Video, Belge) silinir
     elif mode == "2":
         if msg.media and not msg.voice:
             try: await msg.delete()
@@ -59,9 +76,8 @@ async def delete_handler(event):
 
 # --- BAŞLATICI ---
 async def main():
-    print("Bot başlatılıyor...")
     await client.start()
-    print("Giriş yapıldı, koruma sistemi aktif!")
+    print("Bot sessiz modda aktif!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
