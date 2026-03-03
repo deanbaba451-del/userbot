@@ -46,18 +46,22 @@ async def lock_handler(event):
         lock_mode[chat_id] = 0
         await event.reply("🔓 **Kilit kapatıldı.**")
 
-# --- MESAJ DÜZENLEME KONTROLÜ ---
+# --- MESAJ DÜZENLEME KONTROLÜ (TEPKİ HATASI DÜZELTİLDİ) ---
 @client.on(events.MessageEdited)
 async def edited_handler(event):
     if not event.is_group:
         return
     
+    # Eğer düzenlenen şey mesajın içeriği (text) değilse (yani tepki ise), görmezden gel
+    if not event.message.text:
+        return
+
     try:
         # Düzenlenen mesajı sil
         await event.delete()
         # Düzenleyen kişiyi etiketle ve uyar
         sender = await event.get_sender()
-        name = sender.first_name
+        name = sender.first_name if sender.first_name else "Kullanıcı"
         mention = f"[{name}](tg://user?id={event.sender_id})"
         await event.respond(f"⚠️ {mention}, mesaj düzenlemek yasak!")
     except:
@@ -75,29 +79,19 @@ async def delete_handler(event):
 
     msg = event.message
 
-    # /lock 1 -> Her şeyi siler
     if mode == 1:
-        try:
-            await msg.delete()
-        except:
-            pass
+        try: await msg.delete()
+        except: pass
 
-    # /lock 2 -> Metin ve Ses hariç her şeyi siler
     elif mode == 2:
-        # Mesajda medya varsa ve bu medya bir ses kaydı (voice) değilse sil
+        # Mesajda medya varsa ve bu bir ses kaydı (voice) değilse sil
         if msg.media and not msg.voice:
-            try:
-                await msg.delete()
-            except:
-                pass
+            try: await msg.delete()
+            except: pass
 
 # --- BAŞLATICI ---
 async def main():
     print("Bot başlatılıyor...")
     Thread(target=run_server, daemon=True).start()
     await client.start()
-    print("Bot Render üzerinde çalışıyor!")
-    await client.run_until_disconnected()
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    print("Bot Render üzerinde sorunsuz çalışıyor!")
