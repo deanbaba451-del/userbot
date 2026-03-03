@@ -1,24 +1,34 @@
-from telethon import TelegramClient, events
 import os
 import re
+from telethon import TelegramClient, events
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 
-api_id = int(os.getenv("30150271"))
-api_hash = os.getenv("bbe0e183c97ead8a86926ecb95938486")
+# --- RENDER PORT HATASINI ENGELLEMEK İÇİN (HEALTH CHECK) ---
+class HealthCheck(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
 
+def run_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheck)
+    server.serve_forever()
+
+# --- BOT AYARLARI ---
+api_id = 30150271
+api_hash = "bbe0e183c97ead8a86926ecb95938486"
+
+# 'mysession' ismi, yüklediğin mysession.session dosyasıyla aynı olmalı
 client = TelegramClient("mysession", api_id, api_hash)
 
-# Komut kullanabilecek ID'ler
 AUTHORIZED_USERS = [6534222591, 8256872080]
+lock_mode = {}
 
-lock_mode = {}  # grup_id : mod
-
-# LOCK KOMUTU
 @client.on(events.NewMessage(pattern=r'^/lock (.+)'))
 async def lock_handler(event):
-    if event.sender_id not in AUTHORIZED_USERS:
-        return
-
-    if not event.is_group:
+    if event.sender_id not in AUTHORIZED_USERS or not event.is_group:
         return
 
     mode = event.pattern_match.group(1).lower()
@@ -29,53 +39,37 @@ async def lock_handler(event):
         await event.reply("🔒 Lock 1 aktif (Medya + link silinir)")
     elif mode == "2":
         lock_mode[chat_id] = 2
-        await event.reply("🔒 Lock 2 aktif (Sadece metin + ses serbest)")
+        await event.reply("🔒 Lock 2 aktif (Metin + ses serbest)")
     elif mode == "off":
         lock_mode[chat_id] = 0
         await event.reply("🔓 Lock kapatıldı")
-    else:
-        await event.reply("Kullanım: /lock 1 | /lock 2 | /lock off")
 
-# MESAJ KONTROL
 @client.on(events.NewMessage)
 async def delete_handler(event):
-    if not event.is_group:
+    if not event.is_group or event.chat_id not in lock_mode:
         return
 
-    chat_id = event.chat_id
+    mode = lock_mode[event.chat_id]
+    if mode == 0: return
 
-    if chat_id not in lock_mode:
-        return
+    msg = event.message
 
-    mode = lock_mode[chat_id]
-
-    if mode == 0:
-        return
-
-    message = event.message
-
-    # 🔒 LOCK 1 → Medya + link sil
     if mode == 1:
-        if message.media:
-            await message.delete()
-            return
+        if msg.media or (msg.text and re.search(r'https?://|t\.me', msg.text)):
+            try: await msg.delete()
+            except: pass
 
-        if message.text and re.search(r'https?://|t\.me', message.text):
-            await message.delete()
-            return
+    elif mode == 2:
+        # Sadece ses (voice) ve saf metin (media olmayan) kalsın
+        if not msg.voice and msg.media:
+            try: await msg.delete()
+            except: pass
 
-    # 🔒 LOCK 2 → Sadece metin + ses kalsın
-    if mode == 2:
-        # Sesli mesaj serbest
-        if message.voice:
-            return
-
-        # Metin serbest (link olsa bile kalır)
-        if message.text:
-            return
-
-        # Diğer her şey silinir
-        await message.delete()
-
-client.start()
-client.run_until_disconnected()
+# --- BAŞLAT ---
+if __name__ == '__main__':
+    # Render'ın botu kapatmaması için web server'ı başlatıyoruz
+    Thread(target=run_server, daemon=True).start()
+    
+    print("Bot Render üzerinde başlatılıyor...")
+    client.start()
+    client.run_until_disconnected()
