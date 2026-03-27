@@ -24,13 +24,27 @@ HEDEFLER = set()
 
 # botun söyleyeceği mesajlar buraya (istediğin kadar ekle)
 sozler = [
-    "sustun",
-    "yazma artik",
-    "ses ver",
-    "bekliyorum",
-    "tmm",
+    "siktir git öl",
+    "ananın amcığını sikiyim",
+    "emekli babanın kel kafasına döllerimi dökeyim",
+    "şahabettin anneni siksin",
+    "orospunhn çocuğu seni",
     "yaz yaz",
-    "ne oldu"
+    "o amele babanın kamburunu sikerim"
+    "salak ucube orospu çocuğu"
+    "o ananın amcığındaki yumurtaları yerim"
+    "amına doğumun oğlu"
+    "qq anneni siksin"
+    "annen şahabbetine amcığını yedirdi"
+    "ölmüşlerinin mezarına çiçek yerine dildo koyarım"
+    "regl ananın kanını babana içiririm"
+    "otobanda otostop çeken bacına 250km hızla çarparım"
+    "o ananın amına koç taşşağı fırlatırım"
+    "ananı 7 kule zindanlarına atar sike sike kölem ederim"
+    "o ananın sırtına binip at gibi kişnete kişnete sikeyim
+    "annenin göt deliğini parmaklarım sonra boklu parmagımı kendi götüme sokarım"
+    "o ananın amında saltanat kurar hüküm sürerim orospu çocuğu"
+    "lan siktir git öl"
 ]
 
 async def target_ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
