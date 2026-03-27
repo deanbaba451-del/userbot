@@ -10,7 +10,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "bot aktif"
+    return "Bot Aktif"
 
 def run_flask():
     port = int(os.environ.get('PORT', 8080))
@@ -19,10 +19,9 @@ def run_flask():
 # --- AYARLAR ---
 TOKEN = "8685088803:AAGomXnBLdQ-ZRz8Mzssl9dS7d_FlKU6zFY"
 OWNER_ID = 6534222591
-HEDEFLER = {} 
-AKTIF_MESAJLAR = {} 
+HEDEFLER = [] # ID listesi
 SALDIRI_DURUMU = False
-SPAM_HIZI = 2 
+SPAM_HIZI = 0.8 # Hız ayarı
 
 sozler = [
     "siktir git çık gruptan ananı sikeyim", "o ucube tipinle bu grupta ne işin var anasını siktiğim",
@@ -39,7 +38,7 @@ sozler = [
     "ananın amında saltanat kurar hüküm sürerim", "babanın mezarındaki toprakları sike sike çamur edeyim", 
     "bacının amcığına beton döküp heykelini sikeyim", "ananın amına tır dorsesi sokup park edeyim", 
     "senin doğduğun hastaneyi sülaleni sikeyim", "babanın tabutunu sikeyim orospu artığı", 
-    "bacının amına bayrak direği sokup dalgalandırayım", "senin o ucube gen haritanı sikeyim",
+    "bacının amına bayrak direği sokup dalgalayım", "senin o ucube gen haritanı sikeyim",
     "ananın amına jeneratör sokup elektrik üreteyim", "babanın o çürümüş dişlerini sike sike dökeyim",
     "ananın amına kalorifer kazanı sokup ısıtayım", "bacının o ucube amcığını sike sike çürüteyim",
     "senin o fakir ruhunu sülaleni sikeyim", "ananın amına kanca atıp denizde sikeyim",
@@ -75,96 +74,63 @@ sozler = [
     "ananın amına nükleer santral kurayım", "senin sülalendeki her kadını sike sike delirteyim"
 ]
 
-async def start_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == OWNER_ID:
-        mesaj = (
-            "selam hasret,\n\n"
-            "komutlar:\n"
-            "/target - id yaz veya yanıtla (hedef seçer)\n"
-            "/bulk - id1,id2 (çoklu hedef seçer)\n"
-            "/hasret [hız] - saldırıyı başlatır (örn: /hasret 1.5)\n"
-            "/yigit - saldırıyı durdurur ve listeyi siler\n\n"
-            "raporlar artık dm'den gelecek."
-        )
-        await update.message.reply_text(mesaj)
-
-async def spam_dongusu(context, chat_id, user_id, msg_id):
-    isim = HEDEFLER.get(user_id, "")
-    prefix = f"{isim.lower()} " if isim else ""
+async def ekle_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID: return
+    if not context.args:
+        await update.message.reply_text("Lütfen bir @mention veya ID girin.")
+        return
     
-    while SALDIRI_DURUMU and user_id in HEDEFLER and AKTIF_MESAJLAR.get(user_id) == msg_id:
-        try:
-            cevap = random.choice(sozler)
-            await context.bot.send_message(chat_id=chat_id, text=f"{prefix}{cevap}", reply_to_message_id=msg_id)
-            await asyncio.sleep(SPAM_HIZI)
-        except:
-            break
+    target = context.args[0]
+    HEDEFLER.append(target)
+    await update.message.reply_text(f"Hedef eklendi: {target}")
 
-async def target_ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == OWNER_ID:
-        try:
-            target_user = None
-            if update.message.reply_to_message:
-                target_user = update.message.reply_to_message.from_user
-            elif context.args:
-                uid = int(context.args[0].strip())
-                target_user = (await context.bot.get_chat_member(update.effective_chat.id, uid)).user
-            
-            if target_user:
-                name = target_user.first_name if target_user.first_name else ""
-                HEDEFLER[target_user.id] = name
-                await update.message.reply_text(f"hedef: {name} ({target_user.id})")
-        except: pass
-
-async def bulk_ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == OWNER_ID:
-        raw_ids = " ".join(context.args).replace("@", "").split(",")
-        for r_id in raw_ids:
-            if r_id.strip().isdigit():
-                uid = int(r_id.strip())
-                HEDEFLER[uid] = ""
-        await update.message.reply_text(f"{len(HEDEFLER)} kişi hedefe eklendi")
-
-async def genel_isleyici(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global SALDIRI_DURUMU, SPAM_HIZI
-    if not update.message or not update.message.text: return
+async def bulk_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID: return
+    if not context.args:
+        await update.message.reply_text("Lütfen @mentionları aralarında boşluk bırakarak yazın.")
+        return
     
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    msg_id = update.message.id
-    text = update.message.text.lower()
+    for target in context.args:
+        HEDEFLER.append(target)
+    await update.message.reply_text(f"{len(context.args)} adet hedef listeye eklendi.")
 
-    if user_id == OWNER_ID:
-        if text.startswith("/hasret"):
-            SALDIRI_DURUMU = True
+async def baslat_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global SALDIRI_DURUMU
+    if update.effective_user.id != OWNER_ID: return
+    
+    if not HEDEFLER:
+        await update.message.reply_text("Önce hedef ekle!")
+        return
+
+    SALDIRI_DURUMU = True
+    await update.message.reply_text("Saldırı başlatıldı!")
+    
+    while SALDIRI_DURUMU:
+        for hedef in HEDEFLER:
+            if not SALDIRI_DURUMU: break
             try:
-                args = text.split()
-                if len(args) > 1: SPAM_HIZI = float(args[1])
-            except: SPAM_HIZI = 2
-            await update.message.reply_text(f"başladı (hız: {SPAM_HIZI}s)")
-            return
-        
-        if text == "/yigit":
-            SALDIRI_DURUMU = False
-            HEDEFLER.clear()
-            AKTIF_MESAJLAR.clear()
-            await update.message.reply_text("tmm")
-            return
+                soz = random.choice(sozler)
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{hedef} {soz}")
+                await asyncio.sleep(SPAM_HIZI)
+            except Exception as e:
+                print(f"Hata: {e}")
+                await asyncio.sleep(1)
 
-    if SALDIRI_DURUMU and user_id in HEDEFLER:
-        try:
-            await context.bot.send_message(chat_id=OWNER_ID, text="sikme hazır")
-        except: pass
-        AKTIF_MESAJLAR[user_id] = msg_id
-        asyncio.create_task(spam_dongusu(context, chat_id, user_id, msg_id))
+async def dur_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global SALDIRI_DURUMU
+    if update.effective_user.id == OWNER_ID:
+        SALDIRI_DURUMU = False
+        HEDEFLER.clear()
+        await update.message.reply_text("Saldırı durduruldu ve liste temizlendi.")
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
     app_bot = ApplicationBuilder().token(TOKEN).build()
     
-    app_bot.add_handler(CommandHandler("start", start_komutu))
-    app_bot.add_handler(CommandHandler("target", target_ekle))
-    app_bot.add_handler(CommandHandler("bulk", bulk_ekle))
-    app_bot.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), genel_isleyici))
+    app_bot.add_handler(CommandHandler("ekle", ekle_komutu))
+    app_bot.add_handler(CommandHandler("bulk", bulk_komutu))
+    app_bot.add_handler(CommandHandler("baslat", baslat_komutu))
+    app_bot.add_handler(CommandHandler("dur", dur_komutu)) # Ekstra: Durdurmak için
     
+    print("Bot çalışıyor...")
     app_bot.run_polling()
