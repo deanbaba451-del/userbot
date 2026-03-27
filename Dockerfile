@@ -1,18 +1,18 @@
-# Python'un hafif bir sürümünü kullanıyoruz
+# Python'un hafif sürümünü kullanıyoruz
 FROM python:3.10-slim
 
-# Çalışma dizinini oluştur
+# Çalışma dizini
 WORKDIR /app
 
-# Gerekli dosyaları kopyala
+# Dosyaları kopyala
 COPY requirements.txt .
 COPY z.py .
 
 # Kütüphaneleri yükle
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Render'ın portu için çevresel değişken (default 8080)
+# Port ayarı (Render otomatik 8080 kullanır)
 ENV PORT=8080
 
-# Botu çalıştır
+# Botu başlat
 CMD ["python", "z.py"]
