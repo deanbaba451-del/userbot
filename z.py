@@ -18,7 +18,7 @@ def run_flask():
     app.run(host='0.0.0.0', port=port)
 
 # --- AYARLAR ---
-TOKEN = "BOT_TOKEN_BURAYA"
+TOKEN = "8685088803:AAGomXnBLdQ-ZRz8Mzssl9dS7d_FlKU6zFY"
 OWNER_ID = 6534222591
 HEDEFLER = set()
 AKTIF_MESAJLAR = {} # Her user_id için en son mesaj id'sini tutar
