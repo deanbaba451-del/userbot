@@ -1,15 +1,18 @@
-# Hafif bir Python sürümü kullanıyoruz
+# Python'un hafif bir sürümünü kullanıyoruz
 FROM python:3.10-slim
 
-# Çalışma dizinini ayarla
+# Çalışma dizinini oluştur
 WORKDIR /app
 
-# Gerekli dosyaları kopyala ve kur
+# Gerekli dosyaları kopyala
 COPY requirements.txt .
+COPY main.py .
+
+# Kütüphaneleri yükle
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Tüm dosyaları kopyala
-COPY . .
+# Render'ın portu için çevresel değişken (default 8080)
+ENV PORT=8080
 
-# Flask ve Botu aynı anda başlat
+# Botu çalıştır
 CMD ["python", "z.py"]
