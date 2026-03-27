@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Gerekli dosyaları kopyala
 COPY requirements.txt .
-COPY main.py .
+COPY z.py .
 
 # Kütüphaneleri yükle
 RUN pip install --no-cache-dir -r requirements.txt
