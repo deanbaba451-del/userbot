@@ -41,7 +41,7 @@ sozler = [
     "otobanda otostop çeken bacına 250km hızla çarparım"
     "o ananın amına koç taşşağı fırlatırım"
     "ananı 7 kule zindanlarına atar sike sike kölem ederim"
-    "o ananın sırtına binip at gibi kişnete kişnete sikeyim
+    "o ananın sırtına binip at gibi kişnete kişnete sikeyim"
     "annenin göt deliğini parmaklarım sonra boklu parmagımı kendi götüme sokarım"
     "o ananın amında saltanat kurar hüküm sürerim orospu çocuğu"
     "lan siktir git öl"
